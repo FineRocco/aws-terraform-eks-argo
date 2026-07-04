@@ -36,7 +36,7 @@ spec:
               echo "export DB_PASS='$DB_PASS'" > /shared/.env
       containers:
         - name: flask-app
-          image: 145250404945.dkr.ecr.eu-west-1.amazonaws.com/dev-flask-app:cc3a51543be21a697206595a5200dc7da94f3079
+          image: 145250404945.dkr.ecr.eu-west-1.amazonaws.com/dev-flask-app:e77048e2c9fa429f74e4d956dab9e80127d2d3e4
           imagePullPolicy: Always
           ports:
             - containerPort: 80
