@@ -1,4 +1,3 @@
-
 resource "random_password" "db_master_pass" {
   length           = 16
   special          = true
@@ -44,12 +43,9 @@ resource "aws_db_instance" "postgres" {
   instance_class         = "db.t3.micro" 
   allocated_storage      = 20
   username               = "dbadmin"
-  
   password               = random_password.db_master_pass.result 
-  
   db_subnet_group_name   = aws_db_subnet_group.db_subnet_group.name
   vpc_security_group_ids = [aws_security_group.db_sg.id]
-  
   publicly_accessible    = false
   skip_final_snapshot    = true
 
@@ -58,42 +54,38 @@ resource "aws_db_instance" "postgres" {
   }
 }
 
-data "aws_ami" "amazon_linux" {
-  most_recent = true
-  owners      = ["amazon"]
+resource "aws_eks_cluster" "eks_cluster" {
+  name     = "${var.environment}-cluster"
+  role_arn = aws_iam_role.eks_cluster_role.arn
+  version  = var.eks_version
 
-  filter {
-    name   = "name"
-    values = ["al2023-ami-2023.*-x86_64"]
+  vpc_config {
+    subnet_ids = [aws_subnet.private_a.id, aws_subnet.private_b.id, aws_subnet.public_a.id]
   }
+
+  depends_on = [
+    aws_iam_role_policy_attachment.eks_cluster_policy
+  ]
 }
 
-resource "aws_instance" "web" {
-  ami                    = data.aws_ami.amazon_linux.id
-  instance_type          = var.instance_type
-  subnet_id              = aws_subnet.public_a.id
-  vpc_security_group_ids = [aws_security_group.web_sg.id]
+resource "aws_eks_node_group" "eks_nodes" {
+  cluster_name    = aws_eks_cluster.eks_cluster.name
+  node_group_name = "${var.environment}-node-group"
+  node_role_arn   = aws_iam_role.eks_node_role.arn
   
-  iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
+  # Deploy nodes ONLY in private subnets for OPSEC
+  subnet_ids      = [aws_subnet.private_a.id, aws_subnet.private_b.id]
+  instance_types  = [var.instance_type]
 
-  user_data = <<-EOF
-              #!/bin/bash
-              dnf update -y
-              dnf install -y docker
-              systemctl start docker
-              systemctl enable docker
-              usermod -aG docker ec2-user
-
-              dnf install -y ruby wget
-              cd /home/ec2-user
-              wget https://aws-codedeploy-eu-west-1.s3.eu-west-1.amazonaws.com/latest/install
-              chmod +x ./install
-              ./install auto
-              systemctl start codedeploy-agent
-              systemctl enable codedeploy-agent
-              EOF
-
-  tags = {
-    Name = "${var.environment}-web-server"
+  scaling_config {
+    desired_size = 2
+    max_size     = 3
+    min_size     = 1
   }
+
+  depends_on = [
+    aws_iam_role_policy_attachment.eks_worker_node_policy,
+    aws_iam_role_policy_attachment.eks_cni_policy,
+    aws_iam_role_policy_attachment.ecr_read_only
+  ]
 }
