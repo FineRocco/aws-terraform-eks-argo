@@ -45,7 +45,7 @@ jobs:
           kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
           
           # Apply the official stable Argo CD install chart
-          kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+          kubectl apply -n argocd --server-side --force-conflicts -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 
           echo "Waiting for Argo CD API server to initialize..."
           kubectl wait --for=condition=available deployment/argocd-server -n argocd --timeout=300s || true
