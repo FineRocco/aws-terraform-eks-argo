@@ -18,7 +18,6 @@ spec:
       volumes:
         - name: secret-vol
           emptyDir: {}
-
       initContainers:
         - name: fetch-secrets
           image: amazon/aws-cli:latest
@@ -35,10 +34,9 @@ spec:
               RAW_SECRET=$(aws secretsmanager get-secret-value --secret-id dev-postgres-credentials --query SecretString --output text)
               DB_PASS=$(echo $RAW_SECRET | jq -r .password)
               echo "export DB_PASS='$DB_PASS'" > /shared/.env
-
       containers:
         - name: flask-app
-          image: <YOUR_ECR_URL>:latest 
+          image: 145250404945.dkr.ecr.eu-west-1.amazonaws.com/dev-flask-app:b04438459677194acf61b96d1c633de8aae88afe
           imagePullPolicy: Always
           ports:
             - containerPort: 80
@@ -51,11 +49,10 @@ spec:
             - name: DB_NAME
               value: "postgres"
             - name: DB_HOST
-              value: "AUTOMATED_BY_CI"
-          
+              value: "dev-postgres-db.cpsw066wetag.eu-west-1.rds.amazonaws.com"
           command: ["/bin/sh", "-c"]
           args:
-            - |
+            - |-
               source /shared/.env
               python /app/seed_db.py || true
               flask run --host=0.0.0.0 --port=80
