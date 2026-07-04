@@ -33,6 +33,28 @@ jobs:
         working-directory: ./env/dev
         run: terraform apply -auto-approve -no-color
 
+      - name: Bootstrap Argo CD inside EKS
+        working-directory: ./env/dev
+        run: |
+          echo "Connecting runner to EKS cluster..."
+          CLUSTER_NAME=$(terraform output -raw eks_cluster_name)
+          aws eks update-kubeconfig --region eu-west-1 --name "$CLUSTER_NAME"
+
+          echo "Installing Argo CD manifests..."
+          # Idempotent namespace creation (won't fail if it already exists)
+          kubectl create namespace argocd --dry-run=client -o yaml | kubectl apply -f -
+          
+          # Apply the official stable Argo CD install chart
+          kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+
+          echo "Waiting for Argo CD API server to initialize..."
+          kubectl wait --for=condition=available deployment/argocd-server -n argocd --timeout=300s || true
+
+          echo "======================================================="
+          echo "Argo CD Initial Admin Password:"
+          kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d && echo
+          echo "======================================================="
+
       - name: Extract ECR URL from Terraform
         id: get-tf-outputs
         working-directory: ./env/dev
