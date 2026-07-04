@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: flask-app-service
+  namespace: default
+  annotations:
+    # This tells AWS to build a modern, high-performance Network Load Balancer
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+spec:
+  type: LoadBalancer
+  selector:
+    app: flask-app
+  ports:
+    - protocol: TCP
+      port: 80         # The port the internet hits
+      targetPort: 80   # The port your Flask container is listening on

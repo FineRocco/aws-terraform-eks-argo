@@ -1,0 +1,79 @@
+name: "Terraform Apply & GitOps EKS Deployment (Main)"
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  id-token: write
+  contents: write
+
+jobs:
+  terraform-apply-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::145250404945:role/GitHubActionsRole
+          aws-region: eu-west-1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        working-directory: ./env/dev
+        run: terraform init
+
+      - name: Terraform Apply (EKS Infrastructure Gate)
+        working-directory: ./env/dev
+        run: terraform apply -auto-approve -no-color
+
+      - name: Extract ECR URL from Terraform
+        id: get-tf-outputs
+        working-directory: ./env/dev
+        run: |
+          ECR_URL=$(terraform output -raw ecr_repository_url)
+          echo "ECR_URL=$ECR_URL" >> $GITHUB_ENV
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, Tag, and Push Docker Image
+        working-directory: ./app
+        run: |
+          IMAGE_URI="${{ env.ECR_URL }}:${{ github.sha }}"
+          
+          echo "Building and pushing image: $IMAGE_URI"
+          docker build -t $IMAGE_URI .
+          docker push $IMAGE_URI
+
+      - name: GitOps Handoff (Update Kubernetes Manifests)
+        working-directory: ./env/dev
+        run: |
+          # 1. Extract the dynamic variables from Terraform
+          export ECR_URL=$(terraform output -raw ecr_repository_url)
+          export DB_HOST=$(terraform output -raw dev_db_endpoint)
+          export IMAGE_TAG=${{ github.sha }}
+          
+          cd ../../
+          
+          echo "Injecting target database: $DB_HOST into deployment..."
+          
+          # 2. Use 'yq' to surgically update the exact fields in the YAML file
+          yq e -i '.spec.template.spec.containers[0].image = env(ECR_URL) + ":" + env(IMAGE_TAG)' k8s/deployment.yaml
+          yq e -i '(.spec.template.spec.containers[0].env[] | select(.name == "DB_HOST")).value = env(DB_HOST)' k8s/deployment.yaml
+          
+          # 3. Configure Git for the Actions Bot
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # 4. Commit and Push the updated state back to the repository
+          git add k8s/deployment.yaml
+          git commit -m "GitOps Sync: Update image to $IMAGE_TAG and sync DB host" || echo "No changes to commit"
+          git push origin main

@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dev-flask-app
+  namespace: default
+  labels:
+    app: flask-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: flask-app
+  template:
+    metadata:
+      labels:
+        app: flask-app
+    spec:
+      volumes:
+        - name: secret-vol
+          emptyDir: {}
+
+      initContainers:
+        - name: fetch-secrets
+          image: amazon/aws-cli:latest
+          volumeMounts:
+            - name: secret-vol
+              mountPath: /shared
+          env:
+            - name: AWS_DEFAULT_REGION
+              value: "eu-west-1"
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              yum install -y jq
+              RAW_SECRET=$(aws secretsmanager get-secret-value --secret-id dev-postgres-credentials --query SecretString --output text)
+              DB_PASS=$(echo $RAW_SECRET | jq -r .password)
+              echo "export DB_PASS='$DB_PASS'" > /shared/.env
+
+      containers:
+        - name: flask-app
+          image: <YOUR_ECR_URL>:latest 
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 80
+          volumeMounts:
+            - name: secret-vol
+              mountPath: /shared
+          env:
+            - name: DB_USER
+              value: "dbadmin"
+            - name: DB_NAME
+              value: "postgres"
+            - name: DB_HOST
+              value: "AUTOMATED_BY_CI"
+          
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              source /shared/.env
+              python /app/seed_db.py || true
+              flask run --host=0.0.0.0 --port=80
