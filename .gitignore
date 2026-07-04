@@ -3,8 +3,7 @@
 *.tfstate
 *.tfstate.*
 crash.log
-crash.*.log
-*.tfvars          
+crash.*.log    
 override.tf
 override.tf.json
 *_override.tf
