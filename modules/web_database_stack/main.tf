@@ -73,14 +73,28 @@ resource "aws_eks_cluster" "eks_cluster" {
   ]
 }
 
+resource "aws_launch_template" "eks_node_lt" {
+  name_prefix            = "${var.environment}-node-lt-"
+  update_default_version = true
+
+  metadata_options {
+    http_endpoint               = "enabled"
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 2         
+  }
+}
+
 resource "aws_eks_node_group" "eks_nodes" {
   cluster_name    = aws_eks_cluster.eks_cluster.name
   node_group_name = "${var.environment}-node-group"
   node_role_arn   = aws_iam_role.eks_node_role.arn
-  
-  # Deploy nodes ONLY in private subnets for OPSEC
-  subnet_ids      = [aws_subnet.private_a.id, aws_subnet.private_b.id]
+  subnet_ids      = [aws_subnet.public_a.id, aws_subnet.public_b.id]
   instance_types  = [var.instance_type]
+
+  launch_template {
+    id      = aws_launch_template.eks_node_lt.id
+    version = aws_launch_template.eks_node_lt.latest_version
+  }
 
   scaling_config {
     desired_size = 2
