@@ -1,4 +1,4 @@
-# AWS EKS & Argo CD: GitOps Infrastructure Stack
+# AWS EKS & Argo CD: GitOps DevSecOps Stack
 
 An immutable, fully automated GitOps cloud infrastructure project. This repository provisions a secure, multi-AZ AWS network topology, deploys a containerized Python/Flask application onto an Amazon EKS (Kubernetes) cluster, attaches a zero-trust encrypted PostgreSQL database, and orchestrates zero-touch, pull-based deployments via Argo CD—all authenticated seamlessly via OpenID Connect (OIDC).
 
