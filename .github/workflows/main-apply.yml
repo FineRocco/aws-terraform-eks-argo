@@ -107,3 +107,17 @@ jobs:
           git add k8s/deployment.yaml
           git commit -m "GitOps Sync: Update image to $IMAGE_TAG and sync DB host" || echo "No changes to commit"
           git push origin main
+
+      - name: Grant Local User Admin Access
+        working-directory: ./env/dev
+        run: |
+          CLUSTER_NAME=$(terraform output -raw eks_cluster_name)
+          aws eks update-kubeconfig --region eu-west-1 --name "$CLUSTER_NAME"
+          
+          USER_ARN="arn:aws:iam::145250404945:root" 
+          
+          echo "Creating Access Entry for $USER_ARN..."
+          aws eks create-access-entry --region eu-west-1 --cluster-name "$CLUSTER_NAME" --principal-arn "$USER_ARN" || true
+          
+          echo "Attaching Admin Policy..."
+          aws eks associate-access-policy --region eu-west-1 --cluster-name "$CLUSTER_NAME" --principal-arn "$USER_ARN" --policy-arn arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy --access-scope type=cluster || true
