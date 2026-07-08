@@ -30,9 +30,16 @@ spec:
           command: ["/bin/sh", "-c"]
           args:
             - |
-              yum install -y jq
+              set -e
+              yum install -y jq > /dev/null
               RAW_SECRET=$(aws secretsmanager get-secret-value --secret-id dev-postgres-credentials --query SecretString --output text)
               DB_PASS=$(echo $RAW_SECRET | jq -r .password)
+
+              if [ -z "$DB_PASS" ] || [ "$DB_PASS" = "null" ]; then
+                echo "ERROR: Password extraction failed!"
+                exit 1
+              fi
+
               echo "export DB_PASS='$DB_PASS'" > /shared/.env
       containers:
         - name: flask-app
@@ -53,6 +60,7 @@ spec:
           command: ["/bin/sh", "-c"]
           args:
             - |-
+              set -e
               source /shared/.env
               python /app/seed_db.py || true
               flask run --host=0.0.0.0 --port=80
