@@ -1,4 +1,4 @@
-# Cloud-Native Web & Database Stack
+# AWS EKS & Argo CD: GitOps Infrastructure Stack
 
 An immutable, fully automated GitOps cloud infrastructure project. This repository provisions a secure, multi-AZ AWS network topology, deploys a containerized Python/Flask application onto an Amazon EKS (Kubernetes) cluster, attaches a zero-trust encrypted PostgreSQL database, and orchestrates zero-touch, pull-based deployments via Argo CD—all authenticated seamlessly via OpenID Connect (OIDC).
 
@@ -280,7 +280,7 @@ Because Argo CD dynamically provisions AWS Load Balancers that Terraform is blin
 
 * Click the **Run workflow** dropdown and execute it.
   
-This pipeline will automatically remove Kubernetes finalizers, purge the ECR registry, delete the NLB, and cleanly execute terraform destroy.
+This pipeline will automatically remove Kubernetes finalizers, purge the ECR registry, delete the NLB, and cleanly execute `terraform destroy`.
 
 2. **Destroy the Cloud Bootstrap (Local Execution):**
 
