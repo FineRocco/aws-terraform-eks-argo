@@ -33,8 +33,10 @@ jobs:
           aws eks update-kubeconfig --region eu-west-1 --name "$CLUSTER_NAME"
           
           echo "Deleting ArgoCD App to trigger Load Balancer cleanup..."
-          kubectl delete -f ../../k8s/argocd-app.yaml --ignore-not-found=true
           kubectl delete svc flask-app-service --ignore-not-found=true
+          kubectl delete -f ../../k8s/argocd-app.yaml --ignore-not-found=true &
+          sleep 5
+          kubectl patch app flask-app -n argocd -p '{"metadata": {"finalizers": null}}' --type merge || true
           
           echo "Sleeping for 120s to ensure AWS ENIs are detached..."
           sleep 120
